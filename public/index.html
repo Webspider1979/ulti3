@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#a8814a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Ulti3</title>
+<style>
+  :root { --bg:#a8814a; --ink:#3a2410; --white:#fff6e0; --bw:clamp(64px, 11vw, 130px); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; touch-action:manipulation; }
+  html,body { margin:0; height:100%; background:#1b1209; color:var(--ink); font-family:"Courier New",monospace; font-weight:bold; text-transform:uppercase; overflow:hidden; }
+  #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; gap:1.2vw; }
+  #frame { position:relative; width:min(calc(100vw - 2 * var(--bw) - 4vw), calc(100vh * 16 / 9)); aspect-ratio:16/9; background:var(--bg); overflow:hidden; flex:none; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; display:none; }
+  #frame::after { content:""; position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(to bottom, rgba(0,0,0,.10) 0 1px, transparent 1px 3px); }
+  .ctl { flex:none; width:var(--bw); height:min(45vh, calc(var(--bw) * 1.4)); background:#a8814a; color:#3a2410; border:3px solid #3a2410; border-radius:14px; visibility:hidden; display:flex; align-items:center; justify-content:center; text-align:center; font-size:clamp(14px,2.6vw,28px); touch-action:none; }
+  .ctl.on { visibility:visible; }
+  .ctl:active, .ctl.down { background:#3a2410; color:#a8814a; }
+  @media (max-aspect-ratio: 4/3) { #stage { flex-wrap:wrap; align-content:center; } #frame { width:100vw; } .ctl { order:2; height:18vh !important; } }
+
+  .screen { position:absolute; inset:0; display:none; padding:2.5% 3.5%; background:var(--bg); font-size:clamp(10px,1.9vw,22px); line-height:1.35; overflow:hidden; z-index:2; }
+  .screen.on { display:block; }
+  h1 { margin:0 0 .3em; font-size:1.8em; letter-spacing:.15em; }
+  label { display:block; margin:.4em 0 .1em; }
+  input[type=text], select { font:inherit; text-transform:uppercase; background:var(--white); color:var(--ink); border:2px solid var(--ink); padding:.15em .4em; width:12em; max-width:100%; }
+  select { width:auto; }
+  button { font:inherit; text-transform:uppercase; background:var(--ink); color:var(--bg); border:0; padding:.3em 1em; margin:.45em .5em 0 0; cursor:pointer; }
+  button.alt { background:transparent; color:var(--ink); border:2px solid var(--ink); }
+  button:disabled { opacity:.35; }
+  .cols { display:flex; gap:3em; flex-wrap:wrap; }
+  #msg { margin-top:.6em; color:#7a1710; min-height:1.4em; }
+  #invite { margin:.4em 0; display:none; }
+  #jbox { display:inline-block; }
+  #jcode { width:7.5em; text-align:center; letter-spacing:.2em; }
+  #lcode { letter-spacing:.2em; color:var(--white); text-shadow:2px 2px 0 var(--ink); }
+  .pl { display:flex; align-items:center; gap:.5em; }
+  .dot { display:inline-block; width:.8em; height:.8em; border:1px solid var(--ink); flex:none; }
+  .tag { font-size:.7em; background:var(--ink); color:var(--bg); padding:0 .4em; }
+  small { opacity:.75; font-size:.75em; }
+
+  #names div { position:absolute; transform:translate(-50%,-135%); font-size:clamp(10px,2.3vw,26px); text-shadow:1px 1px 0 rgba(0,0,0,.35); pointer-events:none; white-space:nowrap; z-index:1; }
+  #names div.me { text-decoration:underline; }
+  #names { display:none; position:absolute; inset:0; pointer-events:none; } #names.on { display:block; }
+  #count { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(40px,14vw,160px); color:var(--white); text-shadow:3px 3px 0 var(--ink); pointer-events:none; z-index:1; }
+  #snd { position:absolute; top:1.5%; right:1.5%; z-index:6; margin:0; padding:.15em .5em; font-size:clamp(10px,1.8vw,18px); background:rgba(58,36,16,.6); color:var(--white); }
+
+  table { border-collapse:collapse; margin-top:.3em; }
+  td,th { padding:0 1.1em 0 0; text-align:left; font-weight:bold; }
+  td.n { color:var(--white); text-shadow:1px 1px 0 var(--ink); }
+  #results { font-size:clamp(10px,2.1vw,24px); }
+</style>
+</head>
+<body>
+<div id="stage">
+<div class="ctl" id="btnL">&#9664;<br>SX</div>
+<div id="frame">
+  <canvas id="cv"></canvas>
+  <div id="names"></div>
+  <div id="count"></div>
+  <button id="snd">SUONO: ON</button>
+
+  <div class="screen on" id="menu">
+    <h1>ULTI3</h1>
+    <label for="pname">Il tuo nome</label>
+    <input type="text" id="pname" maxlength="6" value="" autocomplete="off">
+    <div id="invite">Sei stato invitato nella stanza <b id="invCode"></b></div>
+    <div>
+      <button id="bEnter" style="display:none">Entra nella stanza</button>
+      <button id="bCreate">Crea stanza online</button>
+      <span id="jbox"><input type="text" id="jcode" maxlength="4" placeholder="CODICE" autocomplete="off"><button id="bJoin">Entra</button></span>
+      <button class="alt" id="bLocal">Gioca da solo (bot)</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="screen" id="lobby">
+    <h1>STANZA <span id="lcode"></span></h1>
+    <div class="cols">
+      <div style="min-width:13em">
+        <div id="plist"></div>
+      </div>
+      <div>
+        <div id="invbox"><button id="bShare">Invita: copia link</button><br><small id="lurl"></small></div>
+        <div id="hostctl">
+          <button class="alt" id="bAdd">+ Bot</button><button class="alt" id="bDel">&minus; Bot</button><br>
+          <label>Bravura bot <select id="lvl"><option value="0">Facile</option><option value="1">Media</option><option value="2">Difficile</option></select></label>
+          <label>Velocit&agrave; <select id="speed"><option value="110">Lenta</option><option value="80">Normale</option><option value="55">Veloce</option></select></label>
+          <button id="bStart">Avvia partita</button>
+        </div>
+        <div id="wait"></div>
+        <button class="alt" id="bLeave">Esci</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="results"></div>
+</div>
+<div class="ctl" id="btnR">&#9654;<br>DX</div>
+</div>
+<script src="game.js"></script>
+<script src="room.js"></script>
+<script src="view.js"></script>
+<script src="audio.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
