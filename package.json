@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Ulti3 - sfida a linee Tron/Snake online fino a 8 giocatori",
   "main": "server.js",
-  "scripts": { "start": "node server.js", "test": "node test/online.test.js" },
+  "scripts": { "start": "node server.js", "test": "node test/scoring.test.js && node test/online.test.js" },
   "engines": { "node": ">=18" },
   "dependencies": { "ws": "^8.18.0" },
   "license": "UNLICENSED",

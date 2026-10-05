@@ -193,10 +193,11 @@
     else if (r.type === 'escape') msg = sc[r.ids[0] - 1].name + ' ESCAPED!';
     else msg = 'ALL PLAYERS CRASHED!';
     const ord = m.round <= 3 ? ORD[m.round - 1] : m.round + 'TH';
-    const rows = sc.slice().sort((a, b) => b.total - a.total || a.id - b.id).map(p =>
-      `<tr><td><span class="dot" style="background:${p.color}"></span> ${p.name}</td><td class="n">${p.r.game}</td><td class="n">${p.r.kills}</td><td class="n">${p.r.killed}</td><td class="n">${p.r.escape}</td><td class="n">${p.total}</td></tr>`).join('');
+    // classifica per TOTAL; a parità più kill totali, poi ordine di ingresso nella stanza
+    const rows = sc.slice().sort((a, b) => b.total - a.total || b.totalKills - a.totalKills || a.id - b.id).map(p =>
+      `<tr><td><span class="dot" style="background:${p.color}"></span> ${p.name}</td><td class="n">${p.r.game}</td><td class="n">${p.r.kills}</td><td class="n">${p.r.escape || '-'}</td><td class="n">${p.total}</td><td class="i">${p.totalKills}</td></tr>`).join('');
     $('results').innerHTML = `${ord}. GAME'S RESULTS...<br><span style="color:var(--white);text-shadow:1px 1px 0 var(--ink)">${msg}</span>
-      <table><tr><th>SCORES:</th><th>GAME</th><th>KILLS</th><th>KILLED</th><th>ESCAPE</th><th>TOTAL</th></tr>${rows}</table><div id="foot"></div>`;
+      <table><tr><th>SCORES:</th><th>GAME</th><th>KILLS</th><th>ESCAPE</th><th>TOTAL</th><th class="i">KILLS TOT</th></tr>${rows}</table><div id="foot"></div>`;
     show('results'); renderResultsFooter();
   }
   function renderResultsFooter() {

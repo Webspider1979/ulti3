@@ -136,7 +136,8 @@
       this.gamePid = [];
       this.entries.forEach((e, i) => {
         g.addPlayer({ name: e.name, color: COLORS[i], bot: e.bot, level: this.cfg.level });
-        g.players[i].total = this.totals.get(e.pid) || 0;
+        const t = this.totals.get(e.pid) || { total: 0, kills: 0 };
+        g.players[i].total = t.total; g.players[i].totalKills = t.kills;
         this.gamePid.push(e.pid);
       });
       g.round = this.roundNo;
@@ -185,11 +186,11 @@
         return;
       }
       const g = this.game;
-      g.players.forEach((p, i) => this.totals.set(this.gamePid[i], p.total));
+      g.players.forEach((p, i) => this.totals.set(this.gamePid[i], { total: p.total, kills: p.totalKills }));
       this.state = 'results';
       this._all({
         t: 'over', round: g.round, result: g.result,
-        scores: g.players.map(p => ({ id: p.id, name: p.name, color: p.color, r: p.r, total: p.total })),
+        scores: g.players.map(p => ({ id: p.id, name: p.name, color: p.color, r: p.r, total: p.total, totalKills: p.totalKills })),
       });
       this._broadcastLobby();
     }

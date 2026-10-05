@@ -10,7 +10,8 @@
   const DEFAULTS = {
     W: 160,
     H: 90,
-    scoring: { win: 4, allCrashed: 1, kill: 1, killed: 0, escape: 5 },
+    // punti: kill = 1 ciascuna; escape = escapeMult x N; il piazzamento si calcola in _finish
+    scoring: { kill: 1, escapeMult: 2 },
     spark: { count: 14, speed: 1.6, life: 4 },
   };
 
@@ -53,7 +54,7 @@
       this.players.push({
         id, name: p.name, color: p.color, bot: !!p.bot, level: p.level == null ? 1 : p.level,
         x: 0, y: 0, dir: 0, alive: false, pending: 0, deathTick: -1, escaped: false,
-        r: { game: 0, kills: 0, killed: 0, escape: 0 }, total: 0,
+        r: { game: 0, kills: 0, escape: 0, place: 0 }, total: 0, totalKills: 0,
       });
       return id;
     }
@@ -95,7 +96,7 @@
       this.players.forEach((p, i) => {
         p.x = lay[i].x; p.y = lay[i].y; p.dir = lay[i].dir;
         p.alive = true; p.pending = 0; p.deathTick = -1; p.escaped = false;
-        p.r = { game: 0, kills: 0, killed: 0, escape: 0 };
+        p.r = { game: 0, kills: 0, escape: 0, place: 0 };
         c[p.y * W + p.x] = p.id;
       });
     }
@@ -206,11 +207,18 @@
         const k = p.ny * W + p.nx, v = c[k];
         if (v !== EMPTY || claims.get(k) > 1) {
           crashed.push(p);
+          // uccisione reale: scia di un avversario ancora vivo (o che muore in questo stesso tick)
           if (v !== EMPTY && v !== BORDER && v !== p.id) {
             const owner = this.players[v - 1];
-            owner.r.kills++;
-            p.r.killed++;
+            if (owner.alive) owner.r.kills++;
           }
+        }
+      }
+      // scontro frontale (stessa cella): ogni giocatore uccide gli altri che l'hanno raggiunta
+      for (const p of crashed) {
+        const k = p.ny * W + p.nx;
+        if (c[k] === EMPTY && claims.get(k) > 1) {
+          p.r.kills += crashed.filter(q => q !== p && q.ny * W + q.nx === k).length;
         }
       }
       for (const p of live) {
@@ -230,7 +238,6 @@
       if (escaper) {
         escaper.alive = false; escaper.escaped = true; escaper.deathTick = this.t;
         this.delta.dead.push(escaper.id);
-        escaper.r.escape++;
         return this._finish({ type: 'escape', ids: [escaper.id] });
       }
       const alive = this.players.filter(p => p.alive);
@@ -241,14 +248,35 @@
       }
     }
 
+    // Punteggio del round (N = giocatori totali, bot compresi):
+    //  - senza escape: i posti per ordine di uscita valgono 0,1,2..N-2; l'ultimo rimasto N.
+    //    Chi esce nello stesso tick prende la media dei posti contesi, arrotondata per eccesso.
+    //  - con escape: solo chi fugge prende escapeMult x N; gli altri 0 di piazzamento.
+    //  - in ogni caso ogni uccisione vale scoring.kill.
     _finish(res) {
       this.over = true;
       this.result = res;
-      const sc = this.scoring;
-      if (res.type === 'win') this.players[res.ids[0] - 1].r.game = sc.win;
-      else if (res.type === 'crash') for (const id of res.ids) this.players[id - 1].r.game = sc.allCrashed;
-      for (const p of this.players) {
-        p.total += p.r.game + p.r.kills * sc.kill + p.r.killed * sc.killed + p.r.escape * sc.escape;
+      const sc = this.scoring, ps = this.players, N = ps.length;
+      if (res.type === 'escape') {
+        ps[res.ids[0] - 1].r.escape = sc.escapeMult * N;
+      } else {
+        const order = ps.slice().sort((a, b) => (a.alive ? Infinity : a.deathTick) - (b.alive ? Infinity : b.deathTick));
+        let pos = 1;
+        for (let i = 0; i < order.length;) {
+          let j = i;
+          const key = order[i].alive ? Infinity : order[i].deathTick;
+          while (j < order.length && (order[j].alive ? Infinity : order[j].deathTick) === key) j++;
+          let sum = 0;
+          for (let k = pos; k < pos + (j - i); k++) sum += k === N ? N : k - 1;
+          const pts = Math.ceil(sum / (j - i));
+          for (let m = i; m < j; m++) order[m].r.place = pts;
+          pos += j - i; i = j;
+        }
+      }
+      for (const p of ps) {
+        p.r.game = p.r.place + p.r.escape + p.r.kills * sc.kill;
+        p.total += p.r.game;
+        p.totalKills += p.r.kills;
       }
     }
   }
